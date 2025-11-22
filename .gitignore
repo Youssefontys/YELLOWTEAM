@@ -1,0 +1,11 @@
+# Terraform specific
+.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfvars
+.env
+
+# Python specific
+__pycache__/
+*.py[cod]
+venv/
