@@ -1,3 +1,4 @@
+# INITIAL RUN, RUN ONCE, SET UP AZURE FOR TERRAFORM STATE
 import os
 import subprocess
 import time

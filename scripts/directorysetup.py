@@ -1,3 +1,4 @@
+# INITIAL RUN, ONLY FOR DEVELOPER FOR SETTING UP PROJECT
 import os
 import sys
 
