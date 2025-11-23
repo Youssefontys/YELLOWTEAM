@@ -3,7 +3,7 @@ import sys
 
 def create_project_structure():
     # 1. Determine the Project Root
-    # Because this script is inside 'initial_setup/', we need to go one level up.
+    # Because this script is inside 'scripts/', we need to go one level up.
     script_location = os.path.dirname(os.path.abspath(__file__))
     project_root = os.path.dirname(script_location)
 
