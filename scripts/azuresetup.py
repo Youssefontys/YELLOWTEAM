@@ -136,16 +136,24 @@ run_az_cmd(f"""
     -o none
 """)
 
-# --- STAP 4: Output ---
-print("\n✅ --- SUCCESVOL AFGEROND ---")
-print("Maak een bestand genaamd 'backend.conf' met deze inhoud:")
-print("-" * 50)
-print(f'resource_group_name  = "{rg_name}"')
-print(f'storage_account_name = "{storage_account_name}"')
-print(f'container_name       = "{container}"')
-print(f'key                  = "prod.terraform.tfstate"')
-print(f'use_azuread_auth     = true')
-print("-" * 50)
+# --- STAP 4: Bestanden Genereren ---
+print("\n📝 Bestanden genereren...")
 
-print("\nInitialiseer Terraform vervolgens met:")
-print("terraform init -backend-config=backend.conf")
+# De  config aanmaken (backend.conf)
+backend_conf_content = f"""resource_group_name  = "{rg_name}"
+storage_account_name = "{storage_account_name}"
+container_name       = "{container}"
+key                  = "prod.terraform.tfstate"
+use_azuread_auth     = true
+"""
+
+with open("backend.conf", "w") as f:
+    f.write(backend_conf_content)
+print(f"✅ 'backend.conf' is aangemaakt.")
+
+
+# --- KLAAR ---
+print("\n✅ --- SUCCESVOL AFGEROND ---")
+print(f"Je backend is klaar voor gebruik in '{storage_account_name}'.")
+print("Je kunt nu direct dit draaien:")
+print("\n    terraform init -backend-config=backend.conf\n")
