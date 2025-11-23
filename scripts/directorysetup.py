@@ -93,3 +93,6 @@ def create_project_structure():
 
 if __name__ == "__main__":
     create_project_structure()
+
+
+    #Zorg dat .gitignore goed word aangemaakt, + remove backend.tf from creation, word via azuresetup gefixt. 
