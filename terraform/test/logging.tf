@@ -1,3 +1,4 @@
+# Logging & monitoring for TEST
 # NSG logs to Log Analytics
 resource "azurerm_monitor_diagnostic_setting" "diag_nsg_app" {
   name                       = "${var.prefix}-diag-nsg-app"
@@ -14,3 +15,4 @@ resource "azurerm_monitor_diagnostic_setting" "diag_nsg_app" {
     enabled  = true
   }
 }
+

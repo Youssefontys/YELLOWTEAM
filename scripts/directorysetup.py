@@ -97,3 +97,76 @@ if __name__ == "__main__":
 
 
     #Zorg dat .gitignore goed word aangemaakt, + remove backend.tf from creation, word via azuresetup gefixt. 
+    ///
+    # --- PROJECT STRUCTURE SETUP ---
+import os
+
+def create_project_structure():
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    print(f"📂 Project Root: {project_root}")
+
+    directories = [
+        ".github/workflows",
+        "app",
+        "terraform"
+    ]
+
+    # Terraform segmented files
+    terraform_files = {
+        "main.tf": "# main entrypoint, call modules here\n",
+        "variables.tf": "# Terraform variables\n",
+        "providers.tf": (
+            "terraform {\n"
+            "  required_providers {\n"
+            "    azurerm = { source = \"hashicorp/azurerm\" version = \"~> 4.0\" }\n"
+            "  }\n"
+            "}\n\n"
+            "provider \"azurerm\" {\n"
+            "  features {}\n"
+            "}\n"
+        ),
+        "network.tf": "# Network resources (VNet, NSG, Subnets)\n",
+        "appservice.tf": "# App Service resources\n",
+        "logging.tf": "# Log Analytics, Monitoring\n",
+        "security.tf": "# WAF, NSG, Storage security settings\n"
+    }
+
+    files = {
+        **{os.path.join("terraform", k): v for k,v in terraform_files.items()},
+        os.path.join("app", "app.py"): "print('Hello World from Azure App Service')\n",
+        ".gitignore": (
+            "# Terraform specific\n"
+            ".terraform/\n"
+            "*.tfstate\n"
+            "*.tfstate.backup\n"
+            "*.tfvars\n"
+            ".env\n"
+            "*.conf\n"
+            "\n"
+            "# Python specific\n"
+            "__pycache__/\n"
+            "*.py[cod]\n"
+            "venv/\n"
+        )
+    }
+
+    # Create directories
+    for d in directories:
+        os.makedirs(os.path.join(project_root, d), exist_ok=True)
+        print(f"✅ Directory ready: {d}")
+
+    # Create files
+    for path, content in files.items():
+        full_path = os.path.join(project_root, path)
+        if os.path.exists(full_path):
+            print(f"⚠️ Skipped: {path} (already exists)")
+        else:
+            with open(full_path, "w", encoding="utf-8") as f:
+                f.write(content)
+            print(f"✅ File created: {path}")
+
+if __name__ == "__main__":
+    create_project_structure()
+
+//
+

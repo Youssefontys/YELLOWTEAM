@@ -1,3 +1,4 @@
+# Terraform variables for TEST
 # Variables (e.g., locations, naming conventions)
 variable "prefix" {
   description = "Naam-prefix voor alle resources"

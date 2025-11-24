@@ -1,3 +1,24 @@
+# Terraform main configuration for TEST
+# Azure Connection Configuration
+terraform {
+  required_version = ">= 1.9.0"  #kloppen deze versies nog?
+
+  required_providers {
+    azurerm = {
+      source  = "hashicorp/azurerm"
+      version = "~> 4.0"
+    }
+  }
+}
+
+provider "azurerm" {
+  features {
+    key_vault {
+      purge_soft_delete_on_destroy = true #wat doet dit? 
+    }
+  }
+}
+
 # Infrastructure (IaC)
 # Define your resources here (App Service, Front Door)
 resource "azurerm_resource_group" "main" {
@@ -66,4 +87,18 @@ resource "azurerm_log_analytics_workspace" "law" {
   sku                 = "PerGB2018"
   retention_in_days   = 30
   tags                = var.tags
+}
+
+
+#outpts.tf?
+output "resource_group" {
+  value = azurerm_resource_group.core.name
+}
+
+output "vnet_id" {
+  value = azurerm_virtual_network.vnet.id
+}
+
+output "log_analytics_id" {
+  value = azurerm_log_analytics_workspace.law.id
 }
