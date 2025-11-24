@@ -1,2 +1,4 @@
-# State File Configuration (IMPORTANT)
-# Configure where the .tfstate is stored (e.g., Azure Storage Account)
+terraform {
+  # Backend wordt via -backend-config=backend.conf ingelezen
+  # → geen geheimen in repo.
+}

@@ -117,9 +117,9 @@ print("🔍 Controleren van Azure login...")
 try:
     # Haal de Subscription ID en Naam op.
     current_sub_name = run_az_cmd("az account show --query name -o tsv")
-    active_sub_id = run_az_cmd("az account show --query id -o tsv") # NIEUW: Haal ID op
+    active_sub_id = run_az_cmd("az account show --query id -o tsv") 
     
-    # FIX: Zet de actieve context expliciet naar de ID van de succesvol ingelogde subscription.
+    # Zet de actieve context expliciet naar de ID van de succesvol ingelogde subscription.
     run_az_cmd(f"az account set --subscription {active_sub_id}")
     
     print(f"✅ Ingelogd op subscription: '{current_sub_name}' (ID: {active_sub_id})")
@@ -279,4 +279,4 @@ print(f"✅ 'backend.conf' is aangemaakt.")
 print("\n✅ --- SUCCESVOL AFGEROND ---")
 print(f"Je backend is klaar voor gebruik in '{storage_account_name}'.")
 print("Je kunt nu direct dit draaien:")
-print("\n    terraform init -backend-config=backend.conf\n")
+print("\n    terraform init -backend-config='backend.conf'\n")
