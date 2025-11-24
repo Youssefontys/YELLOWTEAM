@@ -43,15 +43,6 @@ def create_project_structure():
         # GitHub Actions
         os.path.join(".github/workflows", "ci-cd.yml"): "# Placeholder CI/CD workflow\n",
 
-        # Backend config
-        os.path.join("terraform", "backend.conf"): (
-            "resource_group_name  = \"<RG-NAME>\"\n"
-            "storage_account_name = \"<STORAGE-ACCOUNT-NAME>\"\n"
-            "container_name       = \"<BLOB-CONTAINER>\"\n"
-            "key                  = \"<STATE-FILE-NAME>\"\n"
-            "use_azuread_auth     = true\n"
-        ),
-
         # .gitignore
         ".gitignore": (
             "# Terraform specific\n"
