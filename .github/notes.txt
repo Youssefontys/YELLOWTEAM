@@ -1,0 +1,43 @@
+name: CI/CD Pipeline with Secure Terraform State
+
+on: [push, pull_request]
+
+permissions:
+  id-token: write  # Nodig voor OIDC
+  contents: read
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # 1. Configure OIDC voor Azure (vertrouw GitHub repo met je MI)
+      - name: Azure Login via OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}  # Jouw MI Client ID (repo var)
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}  # Je Azure Tenant ID
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      # 2. Terraform setup
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.0  # Of latest
+
+      - name: Terraform Init (met MI auth)
+        run: |
+          cd terraform/prod  # Of test
+          terraform init -backend-config=../backend.prod.conf
+          # Dit gebruikt nu OIDC -> MI, geen keys!
+
+      - name: Terraform Plan
+        run: terraform plan -var-file=../terraform.tfvars
+
+      # Voeg je security scans toe (SAST, Checkov, etc.)
+      # ...
+
+      # Deploy only on main
+      - name: Terraform Apply
+        if: github.ref == 'refs/heads/main'
+        run: terraform apply -auto-approve -var-file=../terraform.tfvars

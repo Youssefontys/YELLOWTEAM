@@ -9,7 +9,7 @@ def create_project_structure():
     script_location = os.path.dirname(os.path.abspath(__file__))
     project_root = os.path.dirname(script_location)
 
-    print(f"📍 Script location: {script_location}")
+    print(f"\n📍 Script location: {script_location}")
     print(f"📂 Project Root detected: {project_root}\n")
 
     # --- Folders ---
@@ -75,7 +75,7 @@ def create_project_structure():
         else:
             print(f"⚠️  Skipped: {file_path} (File already exists)")
 
-    print("\n🎉 Project setup complete! Ready for Terraform init + CI/CD setup.")
+    print("\n🎉 Project setup complete!")
 
 if __name__ == "__main__":
     create_project_structure()
