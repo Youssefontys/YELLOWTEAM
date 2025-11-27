@@ -1,9 +1,9 @@
-# --- AZURE TERRAFORM STATE BOOTSTRAP (PRO) ---
+# --- AZURE TERRAFORM STATE BOOTSTRAP ---
 # Features:
 # - User Assigned Managed Identity (UAMI)
 # - Key Vault met Purge Protection
 # - Customer Managed Keys (CMK) voor Storage Encryptie
-# - GitHub Secrets integratie (optioneel)
+# - GitHub Secrets integratie 
 # - Volledige RBAC setup (Zero Trust)
 
 import os
@@ -50,10 +50,10 @@ def run_az_cmd_with_retry(command, max_retries=MAX_RETRIES, delay=RETRY_DELAY):
         "ConnectionAbortedError", 
         "RequestDisallowedByPolicy",
         "PrincipalNotFound", # Belangrijk: als de identiteit net is aangemaakt
-        "AuthorizationFailed" # Soms duurt het even voor jijzelf rechten hebt
+        "AuthorizationFailed" # Soms duurt het even voor de rechten zijn toegekend
     ]
     
-    # Lijst met errors die we negeren (omdat het resultaat al goed is)
+    # Lijst met errors die we negeren (omdat het resultaat al in lijn is)
     ignorable_errors = [
         "RoleAssignmentExists", 
         "already exists", 
@@ -94,7 +94,7 @@ def ask_user(question, default=None):
 
 # ---------- Start Bootstrap ----------
 print("\n╔════════════════════════════════════════╗")
-print("║   🛡️  Azure Terraform Secure Setup     ║")
+print("║   🛡️  Azure Terraform Secure Setup      ║")
 print("╚════════════════════════════════════════╝\n")
 
 # 1. Login Check & Account Info
