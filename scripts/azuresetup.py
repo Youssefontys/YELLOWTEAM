@@ -1,10 +1,10 @@
-# --- AZURE TERRAFORM STATE BOOTSTRAP (GOLD STANDARD 2025) ---
+# --- AZURE TERRAFORM STATE BOOTSTRAP ---
 #
 # Deze versie bevat:
 # 1. Zero Trust Customer Managed Keys (CMK) voor de Terraform State.
 # 2. Strict RBAC Role Separation (Least Privilege).
 # 3. Geoptimaliseerde wachttijden en 4096-bit encryptie.
-# 4. Automatische detectie en configuratie van GitHub Secrets (via gh CLI).
+# 4. Robuuste, cross-platform automatische configuratie van GitHub Secrets (via gh CLI).
 
 import os
 import subprocess
@@ -83,13 +83,25 @@ def check_and_configure_gh():
         return False
     
     # Controleer of de gebruiker is ingelogd
+    # BELANGRIJK: Gebruik geen Unix-omleidingen zoals > /dev/null 2>&1
     print("\n🔍 GitHub CLI authenticatie controleren...")
-    result = subprocess.run(
-        "gh auth status --show-token > /dev/null 2>&1",
-        shell=True
-    )
+    
+    # We voeren het commando uit zonder shell=True, en vangen de output om het stil te houden
+    # 'check=False' is cruciaal, want gh geeft returncode 1 bij 'niet ingelogd'.
+    try:
+        result = subprocess.run(
+            ["gh", "auth", "status"],
+            capture_output=True, # Vangt stdout en stderr
+            text=True,
+            check=False # Voorkom uitzondering als returncode 1 is
+        )
+    except FileNotFoundError:
+        # Dit zou door shutil.which() afgevangen moeten zijn, maar voor de zekerheid
+        print("❌ gh CLI is gevonden, maar kan niet worden uitgevoerd.")
+        return False
+
     if result.returncode != 0:
-        print("❌ gh CLI is geïnstalleerd, maar niet ingelogd.")
+        print("❌ gh CLI is geïnstalleerd, maar niet ingelogd of token is verlopen.")
         print("   Authenticeer de CLI aub met: `gh auth login`")
         return False
     
@@ -98,7 +110,7 @@ def check_and_configure_gh():
 
 # ---------- Start Script ----------
 print("\n╔═══════════════════════════════════════════════╗")
-print("║      🛡️  Azure Terraform Bootstrap            ║")
+print("║        🛡️  Azure Terraform Bootstrap           ║")
 print("╚═══════════════════════════════════════════════╝\n")
 
 # 1. Login & Context
@@ -241,6 +253,7 @@ if check_and_configure_gh() and ask_user("GitHub Secrets automatisch instellen? 
     }
 
     for name, value in secrets.items():
+        # De -b vlag zorgt ervoor dat de waarde als body wordt gelezen (veiliger voor special chars)
         cmd = f'gh secret set {name} -b"{value}" --repo {repo}'
         result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
         if result.returncode == 0:
@@ -266,8 +279,12 @@ storage_account_name = "{sa_name}"
 container_name       = "{container}"
 key                  = "{env}/terraform.tfstate"
 use_azuread_auth     = true
+
 subscription_id      = "{active_sub_id}"
 tenant_id            = "{tenant_id}"
 """)
 
 print("\n🎉 GEREED! Setup voltooid. Gebruik nu de backend.conf in Terraform.")
+
+
+#check permissions, eindzin aanpassen?
