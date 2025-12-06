@@ -1,96 +1,110 @@
-# .github/workflows/terraform.yml – ULTIMATE SecDevOps Pipeline 2025
-# Trivy + tfsec + Checkov + Snyk IaC → ALLEMAAL GRATIS
-name: "SecDevOps – Full Security Scanning + Deploy"
-
+# .github/workflows/terraform.yml
+name: SecDevOps – Terraform Security + Deploy
 on:
   push:
     branches: [ main, test, prod ]
   pull_request:
-    branches: [ main ] #aanpassen?
+    branches: [ main, test, prod ]
 
 permissions:
   contents: read
   id-token: write
-  security-events: write   # ← nodig voor Snyk + Checkov SARIF upload
+  security-events: write     # voor SARIF
+  pull-requests: write       # voor tfsec PR comments (NIEUW!)
 
 jobs:
   security-and-deploy:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4.1.7
+        with:
+          fetch-depth: 0
 
-      # ────── AZURE OIDC LOGIN (zero secrets) ──────
-      - name: Azure Login via OIDC
-        uses: azure/login@v2
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2.3.0
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}  
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      # ────── 1. TRIVY – Container Image Scan (nginx:latest) ──────
-      - name: Trivy – Container Vulnerability Scan
-        uses: aquasecurity/trivy-action@master
+      # ─── TFSEC: SARIF (Code Scanning) + PR comments (beste van beide!) ───
+      - name: Run tfsec (SARIF)
+        uses: aquasecurity/tfsec-sarif-action@v0.1.4
         with:
-          image-ref: 'nginx:latest'
-          format: 'table'
-          exit-code: '1'                    # faalt bij CRITICAL/HIGH
-          severity: 'CRITICAL,HIGH'
-          ignore-unfixed: true
+          sarif_file: tfsec.sarif
 
-      # ────── 2. TFSEC – IaC Security Scan (commentaar in PR) ──────
-      - name: tfsec – Terraform Security Scan
-        uses: aquasecurity/tfsec-pr-commenter-action@v1
+      - name: Upload tfsec SARIF → Code Scanning
+        uses: github/codeql-action/upload-sarif@v3.27.0
+        with:
+          sarif_file: tfsec.sarif
+
+      - name: tfsec PR commenter
+        uses: aquasecurity/tfsec-pr-commenter-action@v1.3.1
         with:
           github_token: ${{ github.token }}
 
-      # ────── 3. CHECKOV – IaC Scan (SARIF → GitHub Code Scanning) ──────
-      - name: Checkov – IaC Security Scan
-        uses: bridgecrewio/checkov-action@master
+      # ─── CHECKOV (primaire scanner) ───
+      - name: Run Checkov
+        uses: bridgecrewio/checkov-action@v12.3098.0
         with:
           directory: .
           framework: terraform
           output_format: sarif
           upload_results: true
 
-      # ────── 4. SNYK IaC – Extra IaC Scan (gratis tier) ──────
-      - name: Snyk IaC – Terraform Security Scan
-        uses: snyk/actions/iac@master
+      # ─── SNYK (optioneel) ───
+      - name: Run Snyk IaC
+        if: ${{ secrets.SNYK_TOKEN != '' }}
+        uses: snyk/actions/iac@0.57.0
         env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}   # ← maak gratis account op snyk.io
-        continue-on-error: false                  # faalt bij HIGH/CRITICAL
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
 
-      # ────── TERRAFORM DEPLOY ──────
+      # ─── TRIVY (voor als je later images bouwt) ───
+      - name: Trivy vulnerability scan (optioneel – activeer later)
+        if: false   # ← zet op true zodra je Dockerfiles hebt
+        uses: aquasecurity/trivy-action@0.28.0
+        continue-on-error: true
+        with:
+          scan-type: 'image'
+          image-ref: 'nginx:latest'   # vervang door je eigen image
+          severity: 'CRITICAL,HIGH'
+
+      # ─── TERRAFORM ───
       - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
+        uses: hashicorp/setup-terraform@v3.1.1
+        with:
+          terraform_version: 1.9.8
 
-      - name: Select Environment (branch → backend)
+      - name: Select environment
         id: env
         run: |
           case "${{ github.ref_name }}" in
-            main)   echo "env=dev";  echo "backend=backend.dev.conf" ;;
-            test)   echo "env=test"; echo "backend=backend.test.conf" ;;
-            prod)   echo "env=prod"; echo "backend=backend.prod.conf" ;;
-            *)      echo "env=dev";  echo "backend=backend.dev.conf" ;;
-          esac >> $GITHUB_OUTPUT
+            main)  echo "env=dev"  >> $GITHUB_OUTPUT; echo "backend=backend.dev.conf"  >> $GITHUB_OUTPUT ;;
+            test)  echo "env=test" >> $GITHUB_OUTPUT; echo "backend=backend.test.conf" >> $GITHUB_OUTPUT ;;
+            prod)  echo "env=prod" >> $GITHUB_OUTPUT; echo "backend=backend.prod.conf" >> $GITHUB_OUTPUT ;;
+          esac
 
       - name: Terraform Init
         run: terraform init -backend-config=${{ steps.env.outputs.backend }}
 
-      - name: Terraform Format Check
-        run: terraform fmt -check
-
-      - name: Terraform Validate
-        run: terraform validate
+      - name: Terraform Format & Validate
+        run: |
+          terraform fmt -check
+          terraform validate
 
       - name: Terraform Plan
-        run: |
-          terraform plan \
-            -var="environment=${{ steps.env.outputs.env }}" \
-            -var="project_name=yellowteam" \
-            -out=plan.tfplan
+        run: terraform plan -no-color -out=plan.tfplan
 
-      # Apply alleen bij push (niet bij PR)
+      - name: Upload Plan
+        uses: actions/upload-artifact@v4.4.0
+        with:
+          name: terraform-plan-${{ github.ref_name }}
+          path: plan.tfplan
+
+      # ─── TERRAFORM APPLY – alleen op exacte branches (super veilig) ───
       - name: Terraform Apply
-        if: github.event_name == 'push'
+        if: |
+          github.event_name == 'push' &&
+          (github.ref_name == 'main' || github.ref_name == 'test' || github.ref_name == 'prod')
         run: terraform apply -auto-approve plan.tfplan
