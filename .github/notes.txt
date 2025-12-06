@@ -42,7 +42,7 @@
 | Kosten                               | < €5/maand | B1 + Front Door Standard |
 
 
-Dit is de gouden standaard (die jij nu gewoon overneemt):
+Dit is de gouden standaard:
 
 Je hebt maar één set Terraform-bestanden (in je root of in /infra of waar dan ook)
 → /test folder is nu overbodig
@@ -51,34 +51,11 @@ backend.dev.conf
 backend.test.conf
 backend.prod.conf
 
-Je deployt naar dev/test/prod met één enkele vlag:
-
 # 1. Verwijder alles wat oud/cached is
 rm -rf .terraform .terraform.lock.hcl
 
-# 2. Init met jouw backend (dev)
-terraform init -backend-config=backend.dev.conf
-
 # 3. Check of je code nu écht schoon is
 terraform fmt -write=true
-terraform validate          # ← MOET NU ZEGGEN: "Success! The configuration is valid."
 
-# 4. Plan (kijken wat er gebeurt)
-terraform plan -var="environment=dev" -var="project_name=yellowteam"
-
-# 5. Apply (aanmaken!)
-terraform apply -var="environment=dev" -var="project_name=yellowteam"
-
-# Dev (jouw sandbox)
-terraform init -backend-config=backend.dev.conf
-terraform apply -var="environment=dev" -var="project_name=yellowteam"
-
-# Test (bijv. acceptatie)
-terraform init -backend-config=backend.test.conf
-terraform apply -var="environment=test" -var="project_name=yellowteam"
-
-# Prod (live!)
-terraform init -backend-config=backend.prod.conf
-terraform apply -var="environment=prod" -var="project_name=yellowteam"
 
 
