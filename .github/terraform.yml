@@ -6,7 +6,7 @@ on:
   push:
     branches: [ main, test, prod ]
   pull_request:
-    branches: [ main ]
+    branches: [ main ] #aanpassen?
 
 permissions:
   contents: read
