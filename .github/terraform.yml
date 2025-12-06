@@ -1,0 +1,96 @@
+# .github/workflows/terraform.yml – ULTIMATE SecDevOps Pipeline 2025
+# Trivy + tfsec + Checkov + Snyk IaC → ALLEMAAL GRATIS
+name: "SecDevOps – Full Security Scanning + Deploy"
+
+on:
+  push:
+    branches: [ main, test, prod ]
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: read
+  id-token: write
+  security-events: write   # ← nodig voor Snyk + Checkov SARIF upload
+
+jobs:
+  security-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # ────── AZURE OIDC LOGIN (zero secrets) ──────
+      - name: Azure Login via OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}  
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      # ────── 1. TRIVY – Container Image Scan (nginx:latest) ──────
+      - name: Trivy – Container Vulnerability Scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'nginx:latest'
+          format: 'table'
+          exit-code: '1'                    # faalt bij CRITICAL/HIGH
+          severity: 'CRITICAL,HIGH'
+          ignore-unfixed: true
+
+      # ────── 2. TFSEC – IaC Security Scan (commentaar in PR) ──────
+      - name: tfsec – Terraform Security Scan
+        uses: aquasecurity/tfsec-pr-commenter-action@v1
+        with:
+          github_token: ${{ github.token }}
+
+      # ────── 3. CHECKOV – IaC Scan (SARIF → GitHub Code Scanning) ──────
+      - name: Checkov – IaC Security Scan
+        uses: bridgecrewio/checkov-action@master
+        with:
+          directory: .
+          framework: terraform
+          output_format: sarif
+          upload_results: true
+
+      # ────── 4. SNYK IaC – Extra IaC Scan (gratis tier) ──────
+      - name: Snyk IaC – Terraform Security Scan
+        uses: snyk/actions/iac@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}   # ← maak gratis account op snyk.io
+        continue-on-error: false                  # faalt bij HIGH/CRITICAL
+
+      # ────── TERRAFORM DEPLOY ──────
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Select Environment (branch → backend)
+        id: env
+        run: |
+          case "${{ github.ref_name }}" in
+            main)   echo "env=dev";  echo "backend=backend.dev.conf" ;;
+            test)   echo "env=test"; echo "backend=backend.test.conf" ;;
+            prod)   echo "env=prod"; echo "backend=backend.prod.conf" ;;
+            *)      echo "env=dev";  echo "backend=backend.dev.conf" ;;
+          esac >> $GITHUB_OUTPUT
+
+      - name: Terraform Init
+        run: terraform init -backend-config=${{ steps.env.outputs.backend }}
+
+      - name: Terraform Format Check
+        run: terraform fmt -check
+
+      - name: Terraform Validate
+        run: terraform validate
+
+      - name: Terraform Plan
+        run: |
+          terraform plan \
+            -var="environment=${{ steps.env.outputs.env }}" \
+            -var="project_name=yellowteam" \
+            -out=plan.tfplan
+
+      # Apply alleen bij push (niet bij PR)
+      - name: Terraform Apply
+        if: github.event_name == 'push'
+        run: terraform apply -auto-approve plan.tfplan
