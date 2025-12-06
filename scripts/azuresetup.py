@@ -50,7 +50,7 @@ def run_az_cmd_with_retry(command, max_retries=10, delay=10):
 
     for attempt in range(max_retries):
         try:
-            print(f"   ⏳ {name} (poging {attempt+1})...")
+            print(f"   ⏳ {name} (poging {attempt+1})...")
             result = subprocess.run(command, shell=True, check=True,
                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
             return result.stdout.strip(), True
@@ -58,7 +58,7 @@ def run_az_cmd_with_retry(command, max_retries=10, delay=10):
             err = e.stderr.strip()
             if any(x in err for x in ignorable_errors): return "ℹ️ Genegeerd.", True
             if any(x in err for x in retryable_errors) and attempt < max_retries-1:
-                print(f"    ⚠️ Tijdelijke Azure fout. Wachten {delay}s...")
+                print(f"    ⚠️ Tijdelijke Azure fout. Wachten {delay}s...")
                 time.sleep(delay)
                 delay += 5 
                 continue
@@ -72,37 +72,33 @@ def ask_user(question, default=None):
     while True:
         ans = input(prompt).strip()
         if ans: return ans
-        if default: return default
-
+        if default is not None: return default
+        
 def check_and_configure_gh():
     """Controleert of gh CLI bestaat én is ingelogd, en instrueert de gebruiker indien nodig."""
     if not shutil.which('gh'):
         print("\n⚠️ GitHub CLI (gh) niet gevonden.")
-        print("   Automatische secrets configuratie is niet mogelijk.")
-        print("   Installeer via https://cli.github.com en probeer opnieuw.")
+        print("   Automatische secrets configuratie is niet mogelijk.")
+        print("   Installeer via https://cli.github.com en probeer opnieuw.")
         return False
     
     # Controleer of de gebruiker is ingelogd
-    # BELANGRIJK: Gebruik geen Unix-omleidingen zoals > /dev/null 2>&1
     print("\n🔍 GitHub CLI authenticatie controleren...")
     
-    # We voeren het commando uit zonder shell=True, en vangen de output om het stil te houden
-    # 'check=False' is cruciaal, want gh geeft returncode 1 bij 'niet ingelogd'.
     try:
         result = subprocess.run(
             ["gh", "auth", "status"],
-            capture_output=True, # Vangt stdout en stderr
+            capture_output=True, 
             text=True,
-            check=False # Voorkom uitzondering als returncode 1 is
+            check=False 
         )
     except FileNotFoundError:
-        # Dit zou door shutil.which() afgevangen moeten zijn, maar voor de zekerheid
         print("❌ gh CLI is gevonden, maar kan niet worden uitgevoerd.")
         return False
 
     if result.returncode != 0:
         print("❌ gh CLI is geïnstalleerd, maar niet ingelogd of token is verlopen.")
-        print("   Authenticeer de CLI aub met: `gh auth login`")
+        print("   Authenticeer de CLI aub met: `gh auth login`")
         return False
     
     print("✅ gh CLI is ingelogd en klaar voor gebruik.")
@@ -110,7 +106,7 @@ def check_and_configure_gh():
 
 # ---------- Start Script ----------
 print("\n╔═══════════════════════════════════════════════╗")
-print("║        🛡️  Azure Terraform Bootstrap           ║")
+print("║        🛡️  Azure Terraform Bootstrap           ║")
 print("╚═══════════════════════════════════════════════╝\n")
 
 # 1. Login & Context
@@ -133,13 +129,13 @@ if ask_user("Andere subscription? (j/n)", "n").lower() == 'j':
 current_object_id = run_az_cmd("az ad signed-in-user show --query id -o tsv")
 
 # 2. Providers
-print("\n⚙️  Providers check...")
+print("\n⚙️  Providers check...")
 for p in ["Microsoft.Storage", "Microsoft.KeyVault", "Microsoft.ManagedIdentity"]:
     run_az_cmd_with_retry(f"az provider register --namespace {p} --wait -o none", max_retries=2)
 
 # 3. Input
-rg_name   = ask_user("Resource Group naam", DEFAULT_RG_NAME)
-location  = ask_user("Regio", DEFAULT_LOCATION)
+rg_name   = ask_user("Resource Group naam", DEFAULT_RG_NAME)
+location  = ask_user("Regio", DEFAULT_LOCATION)
 container = ask_user("Blob container naam", "tfstate")
 
 while True:
@@ -153,6 +149,7 @@ mi_name = f"mi-{prefix}-{suffix}"
 kv_name = f"kv-{prefix}-{suffix}" 
 key_name = "tfstate-cmk-key"
 
+# Belangrijke checks voor de deployment
 if ask_user("\nStarten? (j/n)", "j").lower() != 'j': sys.exit(0)
 
 # ---------- UITROL ----------
@@ -165,7 +162,7 @@ run_az_cmd(f"az group create --name {rg_name} --location {location} -o none")
 print(f"→ UAMI '{mi_name}' aanmaken...")
 run_az_cmd_with_retry(f'az identity create --name {mi_name} --resource-group {rg_name} --location {location} -o none')
 
-print("   ⏳ ID propagation...")
+print("   ⏳ ID propagation...")
 mi_principal_id = ""
 for _ in range(12):
     try:
@@ -182,8 +179,6 @@ run_az_cmd(f'az keyvault create --name {kv_name} --resource-group {rg_name} --lo
             --enable-rbac-authorization true --enable-purge-protection true --retention-days 90 -o none')
 
 # D. KV RBAC - Separation of Duties
-# Jij (Admin) -> Officer (Keys maken/beheren)
-# MI (App)    -> Service Encryption User (Microsoft Recommended voor CMK)
 print("→ Key Vault RBAC...")
 kv_scope = f"/subscriptions/{active_sub_id}/resourceGroups/{rg_name}/providers/Microsoft.KeyVault/vaults/{kv_name}"
 
@@ -239,49 +234,75 @@ run_az_cmd_with_retry(f"az storage container create --name {container} --account
 
 # I. AUTOMATISCH GITHUB SECRETS ZETTEN
 print("\n--- GitHub Integratie ---")
-if check_and_configure_gh() and ask_user("GitHub Secrets automatisch instellen? (j/n)", "j").lower() == 'j':
+gh_configured = check_and_configure_gh()
+set_secrets_auto = False
+repo = None
+
+# Vraag of secrets automatisch gezet moeten worden
+if gh_configured:
+    set_secrets_auto = ask_user("GitHub Secrets automatisch instellen? (j/n)", "j").lower() == 'j'
+
+# Optionele SNYK integratie vraag
+use_snyk = ask_user("Snyk testen integreren (SNYK_TOKEN)? (j/n)", "n").lower() == 'j'
+snyk_token = None
+
+if use_snyk:
+    print("\n➡️  Voer je Snyk API Token in.")
+    print("   (Ga naar https://snyk.io → Account Settings → API Token)")
+    snyk_token = ask_user("SNYK_TOKEN")
+    
+# Secrets dictionary (Definieer deze ALTIJD, ongeacht of ze automatisch worden gezet of handmatig getoond)
+secrets = {
+    "AZURE_CLIENT_ID": mi_client_id,
+    "AZURE_SUBSCRIPTION_ID": active_sub_id,
+    "AZURE_TENANT_ID": tenant_id,
+    "BACKEND_RG_NAME": rg_name,
+    "BACKEND_STORAGE_ACCOUNT": sa_name,
+    "BACKEND_CONTAINER_NAME": container
+}
+
+if use_snyk:
+    secrets["SNYK_TOKEN"] = snyk_token
+
+# Dit blok wordt alleen uitgevoerd als GH CLI is geconfigureerd EN de gebruiker koos voor auto-instellen
+if gh_configured and set_secrets_auto:
     repo = ask_user("Volledige GitHub repo (bijv. user/repo)")
     print(f"Secrets aan het zetten in {repo}...")
-
-    secrets = {
-        "AZURE_CLIENT_ID": mi_client_id,
-        "AZURE_SUBSCRIPTION_ID": active_sub_id,
-        "AZURE_TENANT_ID": tenant_id,
-        "BACKEND_RG_NAME": rg_name,
-        "BACKEND_STORAGE_ACCOUNT": sa_name,
-        "BACKEND_CONTAINER_NAME": container
-    }
-
+    
     for name, value in secrets.items():
-        # De -b vlag zorgt ervoor dat de waarde als body wordt gelezen (veiliger voor special chars)
+        # Belangrijk: De code binnen deze for-loop is nu correct ingesprongen
         cmd = f'gh secret set {name} -b"{value}" --repo {repo}'
         result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
         if result.returncode == 0:
-            print(f"   ✅ {name}")
+            print(f"   ✅ {name}")
         else:
-            print(f"   ❌ {name} (mislukt: {result.stderr.strip()})")
+            print(f"   ❌ {name} (mislukt: {result.stderr.strip()})")
 
     print("\nALLES KLAAR! Je repo is nu 100% klaar voor GitHub Actions OIDC.")
 else:
+    # Handmatige instructies
     print("\nHandmatig kopiëren:")
-    print(f"   AZURE_CLIENT_ID         = {mi_client_id}")
-    print(f"   AZURE_SUBSCRIPTION_ID = {active_sub_id}")
-    print(f"   AZURE_TENANT_ID         = {tenant_id}")
-    print(f"   BACKEND_STORAGE_ACCOUNT = {sa_name}")
-
-
+    
+    # Toon alle benodigde secrets, inclusief SNYK indien gevraagd
+    for name, value in secrets.items():
+        # Let op: Snyk token wordt getoond als deze gevraagd is.
+        print(f"   {name:23} = {value}")
+        
+    if use_snyk:
+        print("ℹ️ Vergeet niet de SNYK_TOKEN te kopiëren voor security scans.")
+        
 # J. Output & Files
 print("\n📝 Backend Configs genereren...")
 for env in ["dev", "test", "prod"]:
     with open(f"backend.{env}.conf", "w") as f:
-        f.write(f"""resource_group_name  = "{rg_name}"
+        f.write(f"""resource_group_name  = "{rg_name}"
 storage_account_name = "{sa_name}"
-container_name       = "{container}"
-key                  = "{env}/terraform.tfstate"
-use_azuread_auth     = true
+container_name       = "{container}"
+key                  = "{env}/terraform.tfstate"
+use_azuread_auth     = true
 
-subscription_id      = "{active_sub_id}"
-tenant_id            = "{tenant_id}"
+subscription_id      = "{active_sub_id}"
+tenant_id            = "{tenant_id}"
 """)
 
 print("\n🎉 GEREED! Setup voltooid. Gebruik nu de backend.conf in Terraform.")
