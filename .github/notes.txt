@@ -1,15 +1,14 @@
-### Hoe jij dit het BESTE demonstreert op school (10+ met ster)
+Hoe ik dit het BESTE demonstreert op school (10+ met ster)
 
 **Doel:** laten zien dat je echt snapt wat Zero Trust is → niet alleen code, maar ook het verhaal.
 
 1. Je krijgt na `terraform apply` een output zoals:
-   ```text
    url_via_frontdoor = "https://fd-yellowteam-dev-a1b2c3.azurefd.net"
 **Demo-flow (3 minuten, maximale impact):**
 
 2. **Open je browser – 2 tabs**  
-   Tab 1 → `https://fd-yellowteam-dev-xxxxxx.azurefd.net` → nginx werkt  
-   Tab 2 → `https://app-yellowteam-dev-xxxxxx.azurewebsites.net` → **403 / timeout** → Want `public_network_access_enabled = false` + Private Endpoint → perfect.
+   Tab 1 → `https://fd-yellowteam-dev-xxxxxx.azurefd.net`→nginx werkt  
+   Tab 2 → `https://app-yellowteam-dev-xxxxxx.azurewebsites.net`→**403 / timeout** → Want `public_network_access_enabled = false` + Private Endpoint → perfect.
 
 
 3. **Zeg dit letterlijk (werkt altijd):**
@@ -29,9 +28,10 @@
 
 | Wat je laat zien             | Wat je zegt                                      | Score-impact |
 |------------------------------|--------------------------------------------------|--------------|
-| Front Door URL werkt         | “Dit is de enige ingang – WAF + DDoS protection” | +3           |
-| .azurewebsites.net 403       | “Directe toegang bewust geblokkeerd”             | +4           |
-| Portal → Public access off   | “Geen publiek IP → Zero Trust”                   | +3           |
+| Front Door URL werkt         | “Dit is de enige ingang – WAF + DDoS protection” | +3 |
+| .azurewebsites.net 403       | “Directe toegang bewust geblokkeerd”             | +4 |
+| Portal → Public access off   | “Geen publiek IP → Zero Trust”                   | +3 |
+
 
 | Functie                              | Werkt? | Opmerking |
 |--------------------------------------|--------|----------|
